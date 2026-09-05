@@ -11,7 +11,7 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ========================================
--- LOADING SCREEN WITH ANIMATION
+-- LOADING SCREEN
 -- ========================================
 local loadingGui = Instance.new("ScreenGui")
 loadingGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -24,7 +24,6 @@ loadingFrame.BackgroundColor3 = Color3.fromRGB(8, 0, 8)
 loadingFrame.BackgroundTransparency = 0
 loadingFrame.Parent = loadingGui
 
--- Blood gradient
 local bloodGradient = Instance.new("UIGradient")
 bloodGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 0, 5)),
@@ -35,7 +34,6 @@ bloodGradient.Color = ColorSequence.new({
 })
 bloodGradient.Parent = loadingFrame
 
--- Blood glow effect
 local bloodGlow = Instance.new("Frame")
 bloodGlow.Size = UDim2.new(0.5, 0, 0.35, 0)
 bloodGlow.Position = UDim2.new(0.25, 0, 0.3, 0)
@@ -57,7 +55,7 @@ local glowCorner = Instance.new("UICorner")
 glowCorner.CornerRadius = UDim.new(1, 0)
 glowCorner.Parent = bloodGlow
 
--- Pulsing blood drops (decorative)
+-- Blood drops
 for i = 1, 8 do
     local drop = Instance.new("Frame")
     drop.Size = UDim2.new(0, math.random(15, 35), 0, math.random(15, 35))
@@ -70,12 +68,9 @@ for i = 1, 8 do
     local dropCorner = Instance.new("UICorner")
     dropCorner.CornerRadius = UDim.new(0.5, 0)
     dropCorner.Parent = drop
-    
-    -- Random rotation
     drop.Rotation = math.random(0, 360)
 end
 
--- Main text: Made by E0k
 local mainText = Instance.new("TextLabel")
 mainText.Size = UDim2.new(0.8, 0, 0.2, 0)
 mainText.Position = UDim2.new(0.1, 0, 0.32, 0)
@@ -89,7 +84,6 @@ mainText.TextStrokeColor3 = Color3.fromRGB(100, 0, 0)
 mainText.TextStrokeTransparency = 0.3
 mainText.Parent = loadingFrame
 
--- Sub text: ig: Foxzie.leak
 local subText = Instance.new("TextLabel")
 subText.Size = UDim2.new(0.8, 0, 0.12, 0)
 subText.Position = UDim2.new(0.1, 0, 0.52, 0)
@@ -102,7 +96,6 @@ subText.TextScaled = true
 subText.TextTransparency = 0.4
 subText.Parent = loadingFrame
 
--- Loading bar background
 local loadingBarBg = Instance.new("Frame")
 loadingBarBg.Size = UDim2.new(0.4, 0, 0.025, 0)
 loadingBarBg.Position = UDim2.new(0.3, 0, 0.72, 0)
@@ -116,7 +109,6 @@ local barCorner = Instance.new("UICorner")
 barCorner.CornerRadius = UDim.new(0.5, 0)
 barCorner.Parent = loadingBarBg
 
--- Loading bar fill (blood red)
 local loadingBarFill = Instance.new("Frame")
 loadingBarFill.Size = UDim2.new(0, 0, 1, 0)
 loadingBarFill.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
@@ -127,7 +119,6 @@ local fillCorner = Instance.new("UICorner")
 fillCorner.CornerRadius = UDim.new(0.5, 0)
 fillCorner.Parent = loadingBarFill
 
--- Percentage text
 local percentText = Instance.new("TextLabel")
 percentText.Size = UDim2.new(0.2, 0, 0.04, 0)
 percentText.Position = UDim2.new(0.4, 0, 0.76, 0)
@@ -138,9 +129,6 @@ percentText.TextSize = 18
 percentText.Font = Enum.Font.Gotham
 percentText.Parent = loadingFrame
 
--- ========================================
--- LOADING ANIMATION
--- ========================================
 local function animateLoading()
     local duration = 2.5
     local steps = 30
@@ -148,15 +136,324 @@ local function animateLoading()
     
     for i = 0, steps do
         local progress = i / steps
-        local size = progress * 1
-        loadingBarFill.Size = UDim2.new(size, 0, 1, 0)
+        loadingBarFill.Size = UDim2.new(progress, 0, 1, 0)
         percentText.Text = string.format("%.0f%%", progress * 100)
         wait(stepTime)
     end
 end
 
 -- ========================================
--- MAIN GUI (AFTER LOADING)
+-- SETTINGS
+-- ========================================
+local settings = {
+    players = true,
+    bots = true,
+    items = true,
+    traps = true,
+    house1 = true,
+    house2 = true,
+    mansion = true,
+    minimap = true
+}
+
+local espObjects = {}
+local minimized = false
+local guiRef = nil
+
+-- ========================================
+-- CREATE ESP (LIGHTWEIGHT - NO HIGHLIGHT FOR ITEMS)
+-- ========================================
+local function createESP(target, color, text, textColor, noHighlight)
+    if not target or not target.Parent then return end
+    
+    if espObjects[target] then
+        for _, obj in pairs(espObjects[target]) do
+            pcall(function() obj:Destroy() end)
+        end
+        espObjects[target] = nil
+    end
+    
+    local objects = {}
+    
+    -- Only add highlight if not an item (to reduce lag)
+    if not noHighlight then
+        local highlight = Instance.new("Highlight")
+        highlight.Adornee = target
+        highlight.FillColor = color
+        highlight.FillTransparency = 0.5
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.OutlineTransparency = 0.3
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = target
+        table.insert(objects, highlight)
+    end
+    
+    local head = target:FindFirstChild("Head")
+    if not head then
+        head = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("PrimaryPart")
+    end
+    
+    if head then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Size = UDim2.new(0, 200, 0, 30)
+        billboard.Adornee = head
+        billboard.AlwaysOnTop = true
+        billboard.Parent = head
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text or "???"
+        label.TextColor3 = textColor or Color3.fromRGB(255, 255, 255)
+        label.TextScaled = true
+        label.Font = Enum.Font.GothamBold
+        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        label.TextStrokeTransparency = 0.3
+        label.Parent = billboard
+        
+        table.insert(objects, billboard)
+        table.insert(objects, label)
+    end
+    
+    espObjects[target] = objects
+end
+
+local function removeESP(target)
+    if espObjects[target] then
+        for _, obj in pairs(espObjects[target]) do
+            pcall(function() obj:Destroy() end)
+        end
+        espObjects[target] = nil
+    end
+end
+
+-- ========================================
+-- FIND FUNCTIONS
+-- ========================================
+
+-- Players
+local function findPlayers()
+    local results = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local name = player.Name:lower()
+            if not string.find(name, "granny") and not string.find(name, "grandma") and not string.find(name, "grandpa") and not string.find(name, "slendrina") and not string.find(name, "faceless") then
+                table.insert(results, player.Character)
+            end
+        end
+    end
+    return results
+end
+
+-- Bots (Granny, Grandpa, etc.)
+local function findBots()
+    local results = {}
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local name = player.Name:lower()
+            if string.find(name, "granny") or string.find(name, "grandma") or string.find(name, "grandpa") or string.find(name, "slendrina") or string.find(name, "faceless") then
+                table.insert(results, player.Character)
+            end
+        end
+    end
+    
+    local botNames = {"Granny", "Grandma", "Grandpa", "Slendrina", "Faceless", "Enemy", "NPC", "Boss"}
+    for _, name in ipairs(botNames) do
+        local found = Workspace:FindFirstChild(name)
+        if found and found:IsA("Model") then
+            table.insert(results, found)
+        end
+    end
+    
+    return results
+end
+
+-- House I Items
+local function findHouse1Items()
+    local results = {}
+    local itemNames = {
+        "Master key", "Padlock key", "Car key", "Playhouse key", "Special key", "Weapon key",
+        "Safe key", "Spider key", "Hammer", "Crowbar", "Screwdriver", "Wrench",
+        "Cutting Pliers", "Chain Cutter", "Winch Handle", "Shovel", "Rope", "Hook",
+        "Battery", "Car Battery", "Spark Plug", "Birdseed", "Meat", "Book", "Plank",
+        "Padlock Code", "Remote Control", "Wooden Stick", "Wheel Crank"
+    }
+    
+    local function search(folder)
+        if not folder then return end
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") or child:IsA("Part") or child:IsA("Tool") or child:IsA("BasePart") then
+                local name = child.Name
+                for _, itemName in ipairs(itemNames) do
+                    if name == itemName then
+                        if not child:FindFirstChild("Humanoid") then
+                            table.insert(results, child)
+                        end
+                        break
+                    end
+                end
+            end
+            if child:IsA("Folder") or child:IsA("Model") then
+                search(child)
+            end
+        end
+    end
+    
+    search(Workspace)
+    return results
+end
+
+-- House II Items
+local function findHouse2Items()
+    local results = {}
+    local itemNames = {
+        "Hand wheel", "Door handle", "Security key", "Safe key", "Cutting pliers",
+        "Boat key", "Boat steering wheel", "Gasoline can", "Crowbar", "Padlock key",
+        "Spark plug"
+    }
+    
+    local function search(folder)
+        if not folder then return end
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") or child:IsA("Part") or child:IsA("Tool") or child:IsA("BasePart") then
+                local name = child.Name
+                for _, itemName in ipairs(itemNames) do
+                    if name == itemName then
+                        if not child:FindFirstChild("Humanoid") then
+                            table.insert(results, child)
+                        end
+                        break
+                    end
+                end
+            end
+            if child:IsA("Folder") or child:IsA("Model") then
+                search(child)
+            end
+        end
+    end
+    
+    search(Workspace)
+    return results
+end
+
+-- Mansion Items
+local function findMansionItems()
+    local results = {}
+    local itemNames = {
+        "Padlock key", "Shed key", "Generator cable", "Coin", "Ticket",
+        "Stun gun", "Firewood", "Hand wheel", "Fuse", "Safe key"
+    }
+    
+    local function search(folder)
+        if not folder then return end
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") or child:IsA("Part") or child:IsA("Tool") or child:IsA("BasePart") then
+                local name = child.Name
+                for _, itemName in ipairs(itemNames) do
+                    if name == itemName then
+                        if not child:FindFirstChild("Humanoid") then
+                            table.insert(results, child)
+                        end
+                        break
+                    end
+                end
+            end
+            if child:IsA("Folder") or child:IsA("Model") then
+                search(child)
+            end
+        end
+    end
+    
+    search(Workspace)
+    return results
+end
+
+-- Traps (no doors)
+local function findTraps()
+    local results = {}
+    local trapNames = {"Trap", "Pułapka", "BearTrap", "Pendulum", "Spike", "Cola"}
+    
+    local function search(folder)
+        if not folder then return end
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") or child:IsA("Part") then
+                local name = child.Name:lower()
+                for _, check in ipairs(trapNames) do
+                    if string.find(name, check:lower()) then
+                        table.insert(results, child)
+                        break
+                    end
+                end
+            end
+            if child:IsA("Folder") or child:IsA("Model") then
+                search(child)
+            end
+        end
+    end
+    
+    search(Workspace)
+    return results
+end
+
+-- ========================================
+-- REFRESH ESP
+-- ========================================
+local function refreshESP()
+    -- Cleanup
+    for obj, _ in pairs(espObjects) do
+        if not obj or not obj.Parent then
+            removeESP(obj)
+        end
+    end
+    
+    -- Players (Blue) - with highlight
+    if settings.players then
+        for _, player in ipairs(findPlayers()) do
+            local name = player.Parent and player.Parent.Name or "Player"
+            createESP(player, Color3.fromRGB(0, 120, 255), name, Color3.fromRGB(150, 200, 255), false)
+        end
+    end
+    
+    -- Bots (Red) - with highlight
+    if settings.bots then
+        for _, bot in ipairs(findBots()) do
+            local name = bot.Parent and bot.Parent.Name or "Bot"
+            createESP(bot, Color3.fromRGB(255, 0, 0), name, Color3.fromRGB(255, 100, 100), false)
+        end
+    end
+    
+    -- House I Items (Green) - NO HIGHLIGHT, only text
+    if settings.house1 then
+        for _, item in ipairs(findHouse1Items()) do
+            createESP(item, Color3.fromRGB(0, 255, 0), item.Name, Color3.fromRGB(0, 255, 100), true)
+        end
+    end
+    
+    -- House II Items (Yellow) - NO HIGHLIGHT, only text
+    if settings.house2 then
+        for _, item in ipairs(findHouse2Items()) do
+            createESP(item, Color3.fromRGB(255, 200, 0), item.Name, Color3.fromRGB(255, 200, 0), true)
+        end
+    end
+    
+    -- Mansion Items (Purple) - NO HIGHLIGHT, only text
+    if settings.mansion then
+        for _, item in ipairs(findMansionItems()) do
+            createESP(item, Color3.fromRGB(255, 100, 255), item.Name, Color3.fromRGB(255, 100, 255), true)
+        end
+    end
+    
+    -- Traps (Pink) - with highlight
+    if settings.traps then
+        for _, trap in ipairs(findTraps()) do
+            createESP(trap, Color3.fromRGB(255, 0, 50), "Trap", Color3.fromRGB(255, 50, 100), false)
+        end
+    end
+end
+
+-- ========================================
+-- CREATE MAIN GUI
 -- ========================================
 local function createMainGUI()
     -- Fade out loading
@@ -167,17 +464,15 @@ local function createMainGUI()
     fadeTween.Completed:Wait()
     loadingGui:Destroy()
     
-    -- ========================================
-    -- MAIN ESP GUI
-    -- ========================================
     local gui = Instance.new("ScreenGui")
     gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     gui.ResetOnSpawn = false
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    guiRef = gui
     
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 240, 0, 190)
-    mainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
+    mainFrame.Size = UDim2.new(0, 260, 0, 390)
+    mainFrame.Position = UDim2.new(0.02, 0, 0.05, 0)
     mainFrame.BackgroundColor3 = Color3.fromRGB(12, 0, 8)
     mainFrame.BackgroundTransparency = 0.08
     mainFrame.BorderSizePixel = 2
@@ -190,7 +485,6 @@ local function createMainGUI()
     frameCorner.CornerRadius = UDim.new(0, 10)
     frameCorner.Parent = mainFrame
     
-    -- Blood gradient for main frame
     local mainGrad = Instance.new("UIGradient")
     mainGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 0, 5)),
@@ -199,9 +493,9 @@ local function createMainGUI()
     })
     mainGrad.Parent = mainFrame
     
-    -- TOP BAR with title
+    -- Top Bar
     local topBar = Instance.new("Frame")
-    topBar.Size = UDim2.new(1, 0, 0.2, 0)
+    topBar.Size = UDim2.new(1, 0, 0.12, 0)
     topBar.Position = UDim2.new(0, 0, 0, 0)
     topBar.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
     topBar.BackgroundTransparency = 0.5
@@ -212,32 +506,29 @@ local function createMainGUI()
     topCorner.CornerRadius = UDim.new(0, 10)
     topCorner.Parent = topBar
     
-    -- Title: Made by E0k
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0.6, 0, 1, 0)
+    titleLabel.Size = UDim2.new(0.55, 0, 0.55, 0)
     titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = "Made by E0k"
     titleLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
-    titleLabel.TextSize = 16
+    titleLabel.TextSize = 14
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = topBar
     
-    -- Sub title: ig: Foxzie.leak
     local subLabel = Instance.new("TextLabel")
-    subLabel.Size = UDim2.new(0.4, 0, 1, 0)
-    subLabel.Position = UDim2.new(0.05, 0, 0, 0)
+    subLabel.Size = UDim2.new(0.5, 0, 0.45, 0)
+    subLabel.Position = UDim2.new(0.05, 0, 0.55, 0)
     subLabel.BackgroundTransparency = 1
     subLabel.Text = "ig: Foxzie.leak"
     subLabel.TextColor3 = Color3.fromRGB(200, 100, 150)
-    subLabel.TextSize = 11
+    subLabel.TextSize = 10
     subLabel.Font = Enum.Font.Gotham
     subLabel.TextXAlignment = Enum.TextXAlignment.Left
-    subLabel.Position = UDim2.new(0.05, 0, 0.5, 0)
     subLabel.Parent = topBar
     
-    -- Minimize button
+    -- Minimize Button
     local minBtn = Instance.new("TextButton")
     minBtn.Size = UDim2.new(0.08, 0, 0.6, 0)
     minBtn.Position = UDim2.new(0.82, 0, 0.2, 0)
@@ -254,7 +545,7 @@ local function createMainGUI()
     minCorner.CornerRadius = UDim.new(0, 4)
     minCorner.Parent = minBtn
     
-    -- Auto-destruct button (X)
+    -- Auto-Destruct Button
     local killBtn = Instance.new("TextButton")
     killBtn.Size = UDim2.new(0.08, 0, 0.6, 0)
     killBtn.Position = UDim2.new(0.91, 0, 0.2, 0)
@@ -271,117 +562,176 @@ local function createMainGUI()
     killCorner.CornerRadius = UDim.new(0, 4)
     killCorner.Parent = killBtn
     
-    -- Players button
-    local playersBtn = Instance.new("TextButton")
-    playersBtn.Size = UDim2.new(0.85, 0, 0.16, 0)
-    playersBtn.Position = UDim2.new(0.075, 0, 0.25, 0)
-    playersBtn.BackgroundColor3 = Color3.fromRGB(0, 40, 80)
-    playersBtn.TextColor3 = Color3.fromRGB(200, 220, 255)
-    playersBtn.Text = "[ON] Players"
-    playersBtn.TextScaled = true
-    playersBtn.Font = Enum.Font.GothamBold
-    playersBtn.BorderSizePixel = 1
-    playersBtn.BorderColor3 = Color3.fromRGB(0, 80, 150)
-    playersBtn.Parent = mainFrame
-    
-    local pCorner = Instance.new("UICorner")
-    pCorner.CornerRadius = UDim.new(0, 5)
-    pCorner.Parent = playersBtn
-    
-    -- Items button
-    local itemsBtn = Instance.new("TextButton")
-    itemsBtn.Size = UDim2.new(0.85, 0, 0.16, 0)
-    itemsBtn.Position = UDim2.new(0.075, 0, 0.43, 0)
-    itemsBtn.BackgroundColor3 = Color3.fromRGB(0, 60, 0)
-    itemsBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
-    itemsBtn.Text = "[ON] Items"
-    itemsBtn.TextScaled = true
-    itemsBtn.Font = Enum.Font.GothamBold
-    itemsBtn.BorderSizePixel = 1
-    itemsBtn.BorderColor3 = Color3.fromRGB(0, 150, 0)
-    itemsBtn.Parent = mainFrame
-    
-    local iCorner = Instance.new("UICorner")
-    iCorner.CornerRadius = UDim.new(0, 5)
-    iCorner.Parent = itemsBtn
-    
-    -- Traps only button (no doors)
-    local trapsBtn = Instance.new("TextButton")
-    trapsBtn.Size = UDim2.new(0.85, 0, 0.16, 0)
-    trapsBtn.Position = UDim2.new(0.075, 0, 0.61, 0)
-    trapsBtn.BackgroundColor3 = Color3.fromRGB(80, 30, 0)
-    trapsBtn.TextColor3 = Color3.fromRGB(255, 200, 150)
-    trapsBtn.Text = "[ON] Traps Only"
-    trapsBtn.TextScaled = true
-    trapsBtn.Font = Enum.Font.GothamBold
-    trapsBtn.BorderSizePixel = 1
-    trapsBtn.BorderColor3 = Color3.fromRGB(150, 60, 0)
-    trapsBtn.Parent = mainFrame
-    
-    local tCorner = Instance.new("UICorner")
-    tCorner.CornerRadius = UDim.new(0, 5)
-    tCorner.Parent = trapsBtn
-    
-    -- Clear all button
-    local clearBtn = Instance.new("TextButton")
-    clearBtn.Size = UDim2.new(0.85, 0, 0.16, 0)
-    clearBtn.Position = UDim2.new(0.075, 0, 0.79, 0)
-    clearBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    clearBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    clearBtn.Text = "[OFF] Disable All"
-    clearBtn.TextScaled = true
-    clearBtn.Font = Enum.Font.GothamBold
-    clearBtn.BorderSizePixel = 1
-    clearBtn.BorderColor3 = Color3.fromRGB(80, 80, 80)
-    clearBtn.Parent = mainFrame
-    
-    local cCorner = Instance.new("UICorner")
-    cCorner.CornerRadius = UDim.new(0, 5)
-    cCorner.Parent = clearBtn
+    -- ========================================
+    -- BUTTON CREATOR
+    -- ========================================
+    local function makeButton(text, yPos, bgColor, borderColor)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.85, 0, 0.10, 0)
+        btn.Position = UDim2.new(0.075, 0, yPos, 0)
+        btn.BackgroundColor3 = bgColor
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Text = text
+        btn.TextScaled = true
+        btn.Font = Enum.Font.GothamBold
+        btn.BorderSizePixel = 1
+        btn.BorderColor3 = borderColor
+        btn.Parent = mainFrame
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 5)
+        corner.Parent = btn
+        
+        return btn
+    end
     
     -- ========================================
-    -- SETTINGS
+    -- BUTTONS
     -- ========================================
-    local settings = {
-        players = true,
-        items = true,
-        traps = true
-    }
+    local playersBtn = makeButton("[ON] Players", 0.14, Color3.fromRGB(0, 40, 80), Color3.fromRGB(0, 80, 150))
+    local botsBtn = makeButton("[ON] Bots", 0.25, Color3.fromRGB(80, 0, 0), Color3.fromRGB(150, 0, 0))
+    local house1Btn = makeButton("[ON] House I", 0.36, Color3.fromRGB(0, 60, 0), Color3.fromRGB(0, 150, 0))
+    local house2Btn = makeButton("[ON] House II", 0.47, Color3.fromRGB(80, 60, 0), Color3.fromRGB(150, 100, 0))
+    local mansionBtn = makeButton("[ON] Mansion", 0.58, Color3.fromRGB(80, 0, 60), Color3.fromRGB(150, 0, 100))
+    local trapsBtn = makeButton("[ON] Traps", 0.69, Color3.fromRGB(80, 30, 0), Color3.fromRGB(150, 60, 0))
+    local minimapBtn = makeButton("[ON] Minimap", 0.80, Color3.fromRGB(0, 40, 80), Color3.fromRGB(0, 80, 150))
+    local clearBtn = makeButton("[OFF] Disable All", 0.91, Color3.fromRGB(40, 40, 40), Color3.fromRGB(80, 80, 80))
     
-    local espObjects = {}
-    local minimized = false
-    local mainGuiRef = gui
+    -- ========================================
+    -- MINIMAP
+    -- ========================================
+    local minimapGui = Instance.new("ScreenGui")
+    minimapGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    minimapGui.ResetOnSpawn = false
+    minimapGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- ========================================
-    -- MINIMIZE FUNCTION
-    -- ========================================
-    local function toggleMinimize()
-        minimized = not minimized
-        if minimized then
-            mainFrame.Size = UDim2.new(0, 240, 0, 45)
-            minBtn.Text = "+"
-            -- Hide all buttons except top bar
-            playersBtn.Visible = false
-            itemsBtn.Visible = false
-            trapsBtn.Visible = false
-            clearBtn.Visible = false
-        else
-            mainFrame.Size = UDim2.new(0, 240, 0, 190)
-            minBtn.Text = "_"
-            playersBtn.Visible = true
-            itemsBtn.Visible = true
-            trapsBtn.Visible = true
-            clearBtn.Visible = true
+    local minimapFrame = Instance.new("Frame")
+    minimapFrame.Size = UDim2.new(0, 180, 0, 180)
+    minimapFrame.Position = UDim2.new(0.77, 0, 0.05, 0)
+    minimapFrame.BackgroundColor3 = Color3.fromRGB(10, 0, 10)
+    minimapFrame.BackgroundTransparency = 0.15
+    minimapFrame.BorderSizePixel = 2
+    minimapFrame.BorderColor3 = Color3.fromRGB(180, 0, 0)
+    minimapFrame.Parent = minimapGui
+    
+    local mmCorner = Instance.new("UICorner")
+    mmCorner.CornerRadius = UDim.new(0, 10)
+    mmCorner.Parent = minimapFrame
+    
+    local mmGrad = Instance.new("UIGradient")
+    mmGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 0, 5)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 0, 10)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 0, 5))
+    })
+    mmGrad.Parent = minimapFrame
+    
+    local mmTitle = Instance.new("TextLabel")
+    mmTitle.Size = UDim2.new(1, 0, 0.12, 0)
+    mmTitle.Position = UDim2.new(0, 0, 0, 0)
+    mmTitle.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+    mmTitle.BackgroundTransparency = 0.5
+    mmTitle.Text = "Minimap"
+    mmTitle.TextColor3 = Color3.fromRGB(255, 150, 150)
+    mmTitle.TextScaled = true
+    mmTitle.Font = Enum.Font.GothamBold
+    mmTitle.Parent = minimapFrame
+    
+    local mmClose = Instance.new("TextButton")
+    mmClose.Size = UDim2.new(0.12, 0, 0.08, 0)
+    mmClose.Position = UDim2.new(0.86, 0, 0.02, 0)
+    mmClose.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+    mmClose.TextColor3 = Color3.fromRGB(255, 100, 100)
+    mmClose.Text = "X"
+    mmClose.TextSize = 14
+    mmClose.Font = Enum.Font.GothamBold
+    mmClose.BorderSizePixel = 1
+    mmClose.BorderColor3 = Color3.fromRGB(200, 0, 0)
+    mmClose.Parent = minimapFrame
+    
+    mmClose.MouseButton1Click:Connect(function()
+        minimapFrame.Visible = not minimapFrame.Visible
+    end)
+    
+    local dotContainer = {}
+    local minimapEnabled = true
+    local mmLoop = nil
+    
+    -- Update Minimap
+    local function updateMinimap()
+        for _, dot in pairs(dotContainer) do
+            pcall(function() dot:Destroy() end)
+        end
+        dotContainer = {}
+        
+        local cam = workspace.CurrentCamera
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        local myPos = root.Position
+        local scale = 1 / 30
+        
+        local function addDot(pos, color, size)
+            local dx = (pos.X - myPos.X) * scale
+            local dz = (pos.Z - myPos.Z) * scale
+            if math.abs(dx) > 0.5 or math.abs(dz) > 0.5 then return end
+            
+            local dot = Instance.new("Frame")
+            dot.Size = UDim2.new(0, size or 8, 0, size or 8)
+            dot.Position = UDim2.new(0.5 + dx - 0.02, 0, 0.5 + dz - 0.02, 0)
+            dot.BackgroundColor3 = color
+            dot.BackgroundTransparency = 0
+            dot.BorderSizePixel = 0
+            dot.Parent = minimapFrame
+            
+            local dc = Instance.new("UICorner")
+            dc.CornerRadius = UDim.new(1, 0)
+            dc.Parent = dot
+            
+            table.insert(dotContainer, dot)
+        end
+        
+        -- Player (You)
+        addDot(myPos, Color3.fromRGB(0, 100, 255), 10)
+        
+        -- Other players
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    local name = player.Name:lower()
+                    if string.find(name, "granny") or string.find(name, "grandma") or string.find(name, "grandpa") or string.find(name, "slendrina") then
+                        addDot(rootPart.Position, Color3.fromRGB(255, 0, 0), 10)
+                    else
+                        addDot(rootPart.Position, Color3.fromRGB(0, 255, 0), 8)
+                    end
+                end
+            end
         end
     end
     
-    minBtn.MouseButton1Click:Connect(toggleMinimize)
+    mmLoop = RunService.Heartbeat:Connect(function()
+        if minimapFrame and minimapFrame.Visible then
+            updateMinimap()
+        end
+    end)
     
     -- ========================================
-    -- AUTO-DESTRUCT FUNCTION
+    -- BUTTON FUNCTIONS
     -- ========================================
-    local function autoDestruct()
-        -- Remove all ESP
+    
+    -- Minimap Toggle
+    minimapBtn.MouseButton1Click:Connect(function()
+        minimapEnabled = not minimapEnabled
+        minimapBtn.Text = minimapEnabled and "[ON] Minimap" or "[OFF] Minimap"
+        if minimapFrame then
+            minimapFrame.Visible = minimapEnabled
+        end
+    end)
+    
+    -- Auto-Destruct
+    killBtn.MouseButton1Click:Connect(function()
         for obj, _ in pairs(espObjects) do
             if espObjects[obj] then
                 for _, espObj in pairs(espObjects[obj]) do
@@ -390,255 +740,46 @@ local function createMainGUI()
                 espObjects[obj] = nil
             end
         end
-        -- Remove GUI
-        pcall(function() mainGuiRef:Destroy() end)
-        pcall(function() loadingGui:Destroy() end)
+        pcall(function() gui:Destroy() end)
+        pcall(function() minimapGui:Destroy() end)
+        if mmLoop then pcall(function() mmLoop:Disconnect() end) end
         print("GRANNY ESP - DESTROYED")
-    end
+    end)
     
-    killBtn.MouseButton1Click:Connect(autoDestruct)
-    
-    -- ========================================
-    -- CREATE ESP
-    -- ========================================
-    local function createESP(target, color, text, textColor)
-        if not target or not target.Parent then return end
-        
-        if espObjects[target] then
-            for _, obj in pairs(espObjects[target]) do
-                pcall(function() obj:Destroy() end)
-            end
-            espObjects[target] = nil
-        end
-        
-        local objects = {}
-        
-        local highlight = Instance.new("Highlight")
-        highlight.Adornee = target
-        highlight.FillColor = color
-        highlight.FillTransparency = 0.5
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.OutlineTransparency = 0.3
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.Parent = target
-        table.insert(objects, highlight)
-        
-        local head = target:FindFirstChild("Head")
-        if not head then
-            head = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("PrimaryPart")
-        end
-        
-        if head then
-            local billboard = Instance.new("BillboardGui")
-            billboard.Size = UDim2.new(0, 200, 0, 30)
-            billboard.Adornee = head
-            billboard.AlwaysOnTop = true
-            billboard.Parent = head
-            
-            local label = Instance.new("TextLabel")
-            label.Size = UDim2.new(1, 0, 1, 0)
-            label.BackgroundTransparency = 1
-            label.Text = text or "???"
-            label.TextColor3 = textColor or Color3.fromRGB(255, 255, 255)
-            label.TextScaled = true
-            label.Font = Enum.Font.GothamBold
-            label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-            label.TextStrokeTransparency = 0.3
-            label.Parent = billboard
-            
-            table.insert(objects, billboard)
-            table.insert(objects, label)
-        end
-        
-        espObjects[target] = objects
-    end
-    
-    local function removeESP(target)
-        if espObjects[target] then
-            for _, obj in pairs(espObjects[target]) do
-                pcall(function() obj:Destroy() end)
-            end
-            espObjects[target] = nil
+    -- Minimize
+    local function toggleMinimize()
+        minimized = not minimized
+        if minimized then
+            mainFrame.Size = UDim2.new(0, 260, 0, 45)
+            minBtn.Text = "+"
+            playersBtn.Visible = false
+            botsBtn.Visible = false
+            house1Btn.Visible = false
+            house2Btn.Visible = false
+            mansionBtn.Visible = false
+            trapsBtn.Visible = false
+            minimapBtn.Visible = false
+            clearBtn.Visible = false
+        else
+            mainFrame.Size = UDim2.new(0, 260, 0, 390)
+            minBtn.Text = "_"
+            playersBtn.Visible = true
+            botsBtn.Visible = true
+            house1Btn.Visible = true
+            house2Btn.Visible = true
+            mansionBtn.Visible = true
+            trapsBtn.Visible = true
+            minimapBtn.Visible = true
+            clearBtn.Visible = true
         end
     end
     
-    -- ========================================
-    -- FIND FUNCTIONS
-    -- ========================================
-    local function findPlayers()
-        local results = {}
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                table.insert(results, player.Character)
-            end
-        end
-        return results
-    end
+    minBtn.MouseButton1Click:Connect(toggleMinimize)
     
-    local function findItems()
-        local results = {}
-        local itemNames = {
-            "Master key", "Padlock key", "Car key", "Playhouse key", "Special key", "Weapon key",
-            "Safe key", "Rusty Padlock key", "Spider key", "Hammer", "Crowbar", "Screwdriver",
-            "Wrench", "Cutting Pliers", "Chain Cutter", "Winch Handle", "Shovel", "Rope",
-            "Hook", "Battery", "Car Battery", "Spark Plug", "Birdseed", "Meat", "Book",
-            "Plank", "Padlock Code", "Remote Control", "Wooden Stick", "Wheel Crank"
-        }
-        local function search(folder)
-            if not folder then return end
-            for _, child in ipairs(folder:GetChildren()) do
-                if child:IsA("Model") or child:IsA("Part") or child:IsA("Tool") or child:IsA("BasePart") then
-                    local name = child.Name
-                    for _, itemName in ipairs(itemNames) do
-                        if name == itemName then
-                            if not child:FindFirstChild("Humanoid") then
-                                table.insert(results, child)
-                            end
-                            break
-                        end
-                    end
-                end
-                if child:IsA("Folder") or child:IsA("Model") then
-                    search(child)
-                end
-            end
-        end
-        search(Workspace)
-        return results
-    end
-    
-    -- TRAPS ONLY (NO DOORS)
-    local function findTraps()
-        local results = {}
-        local trapNames = {"Trap", "Pułapka", "BearTrap", "Pendulum", "Spike", "Cola"}
-        
-        local function search(folder)
-            if not folder then return end
-            for _, child in ipairs(folder:GetChildren()) do
-                if child:IsA("Model") or child:IsA("Part") then
-                    local name = child.Name:lower()
-                    for _, check in ipairs(trapNames) do
-                        if string.find(name, check:lower()) then
-                            table.insert(results, child)
-                            break
-                        end
-                    end
-                end
-                if child:IsA("Folder") or child:IsA("Model") then
-                    search(child)
-                end
-            end
-        end
-        
-        search(Workspace)
-        return results
-    end
-    
-    -- ========================================
-    -- REFRESH ESP
-    -- ========================================
-    local function refreshESP()
-        for obj, _ in pairs(espObjects) do
-            if not obj or not obj.Parent then
-                removeESP(obj)
-            end
-        end
-        
-        if settings.players then
-            for _, player in ipairs(findPlayers()) do
-                createESP(player, Color3.fromRGB(0, 120, 255), player.Name, Color3.fromRGB(150, 200, 255))
-            end
-        end
-        
-        if settings.items then
-            for _, item in ipairs(findItems()) do
-                createESP(item, Color3.fromRGB(0, 255, 0), item.Name, Color3.fromRGB(0, 255, 100))
-            end
-        end
-        
-        if settings.traps then
-            for _, trap in ipairs(findTraps()) do
-                createESP(trap, Color3.fromRGB(255, 0, 50), "⚠️ Trap", Color3.fromRGB(255, 50, 100))
-            end
-        end
-    end
-    
-    -- ========================================
-    -- BUTTON CONTROLS
-    -- ========================================
+    -- Players Toggle
     playersBtn.MouseButton1Click:Connect(function()
         settings.players = not settings.players
         playersBtn.Text = settings.players and "[ON] Players" or "[OFF] Players"
         playersBtn.BackgroundColor3 = settings.players and Color3.fromRGB(0, 40, 80) or Color3.fromRGB(30, 30, 30)
         if not settings.players then
-            for obj, _ in pairs(espObjects) do
-                if obj and obj.Parent and obj:FindFirstChild("Humanoid") then
-                    removeESP(obj)
-                end
-            end
-        end
-    end)
-    
-    itemsBtn.MouseButton1Click:Connect(function()
-        settings.items = not settings.items
-        itemsBtn.Text = settings.items and "[ON] Items" or "[OFF] Items"
-        itemsBtn.BackgroundColor3 = settings.items and Color3.fromRGB(0, 60, 0) or Color3.fromRGB(30, 30, 30)
-        if not settings.items then
-            for obj, _ in pairs(espObjects) do
-                if obj and obj.Parent and not obj:FindFirstChild("Humanoid") and not string.find(obj.Name:lower(), "trap") then
-                    removeESP(obj)
-                end
-            end
-        end
-    end)
-    
-    trapsBtn.MouseButton1Click:Connect(function()
-        settings.traps = not settings.traps
-        trapsBtn.Text = settings.traps and "[ON] Traps Only" or "[OFF] Traps Only"
-        trapsBtn.BackgroundColor3 = settings.traps and Color3.fromRGB(80, 30, 0) or Color3.fromRGB(30, 30, 30)
-        if not settings.traps then
-            for obj, _ in pairs(espObjects) do
-                if obj and obj.Parent and string.find(obj.Name:lower(), "trap") then
-                    removeESP(obj)
-                end
-            end
-        end
-    end)
-    
-    clearBtn.MouseButton1Click:Connect(function()
-        settings.players = false
-        settings.items = false
-        settings.traps = false
-        
-        playersBtn.Text = "[OFF] Players"
-        playersBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        itemsBtn.Text = "[OFF] Items"
-        itemsBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        trapsBtn.Text = "[OFF] Traps Only"
-        trapsBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        
-        for obj, _ in pairs(espObjects) do
-            removeESP(obj)
-        end
-    end)
-    
-    -- ========================================
-    -- MAIN LOOP
-    -- ========================================
-    RunService.Heartbeat:Connect(function()
-        refreshESP()
-    end)
-    
-    refreshESP()
-    print("GRANNY ESP LOADED")
-    print("Made by E0k | ig: Foxzie.leak")
-end
-
--- ========================================
--- START
--- ========================================
-coroutine.wrap(function()
-    animateLoading()
-    wait(0.3)
-    createMainGUI()
-end)()
+            for obj, _ in pairs
